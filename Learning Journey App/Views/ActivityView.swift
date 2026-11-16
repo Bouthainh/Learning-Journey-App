@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct ActivityView: View {
@@ -40,6 +39,7 @@ struct ActivityView: View {
             Spacer()
         }
         .padding(.horizontal, 16)
+        .toolbar(.hidden, for: .navigationBar)   // our own header replaces the nav bar
     }
 
     // MARK: - Header
@@ -82,8 +82,29 @@ struct ActivityView: View {
 
     // MARK: Log section (primary button and freeze button)
 
+    //MARK: button style cases
+    private var buttonLooks: (circle: ButtonLook, freeze: ButtonLook) {
+        // every possible look, named once
+        let learnActive    = ButtonLook(title: "Log as Learned",    textColor: .white, glass: .regular.tint(.orange).interactive())
+        let learnDone      = ButtonLook(title: "Logged as Learned", textColor: .gray,  glass: .regular)
+        let freezeActive   = ButtonLook(title: "Freeze for a day",  textColor: .white, glass: .regular.tint(.cyan).interactive())
+        let freezeDisabled = ButtonLook(title: "Freeze for a day",  textColor: .gray,  glass: .regular)
+        let freezeDone     = ButtonLook(title: "Freezed for a day", textColor: .gray,  glass: .regular)
+
+        // the freeze button is blue only if there are freezes left
+        let freezeAvailable = journeyManager.canFreeze ? freezeActive : freezeDisabled
+
+        // only the button that was pressed today is "done";
+        // the other one stays active so the user can change their mind
+        switch journeyManager.todayState {
+        case .notLogged: return (circle: learnActive, freeze: freezeAvailable)
+        case .Learn:     return (circle: learnDone,   freeze: freezeAvailable)
+        case .freeze:    return (circle: learnActive, freeze: freezeDone)
+        }
+    }
+    
     private var logSection: some View {
-        let looks = buttonLooks   // decide once
+        let looks = buttonLooks
 
         return VStack(spacing: 24) {
 
@@ -116,36 +137,7 @@ struct ActivityView: View {
                 .foregroundStyle(.gray)
         }
     }
-    
-    //MARK: button style cases
-    private var buttonLooks: (circle: ButtonLook, freeze: ButtonLook) {
-        let done = ButtonLook(title: "", textColor: .gray, glass: .regular)
 
-        switch journeyManager.todayState {
-        case .notLogged:
-            return (
-                circle: ButtonLook(title: "Log as Learned", textColor: .white,
-                                   glass: .regular.tint(.orange).interactive()),
-                freeze: journeyManager.canFreeze
-                    ? ButtonLook(title: "Freeze for a day", textColor: .white,
-                                 glass: .regular.tint(.cyan).interactive())
-                    : ButtonLook(title: "Freeze for a day", textColor: .gray, glass: .regular)
-            )
-
-        case .Learn:
-            return (
-                circle: ButtonLook(title: "Logged as Learned", textColor: done.textColor, glass: done.glass),
-                freeze: ButtonLook(title: "Freeze for a day", textColor: done.textColor, glass: done.glass)
-            )
-
-        case .freeze:
-            return (
-                circle: ButtonLook(title: "Day Freezed", textColor: done.textColor, glass: done.glass),
-                freeze: ButtonLook(title: "Freezed for a day", textColor: done.textColor, glass: done.glass)
-            )
-        }
-    }
-    
     // MARK: Goal ended cases: well done / didn't reach
 
     private func goalEnded(icon: String, title: String, subtitle: String) -> some View {
@@ -209,21 +201,6 @@ private struct ButtonLook {
     let textColor: Color
     let glass: Glass
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #Preview("Active") {
     NavigationStack { ActivityView() }

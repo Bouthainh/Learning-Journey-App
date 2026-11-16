@@ -39,6 +39,9 @@ class JourneyManager {
         goal?.duration ?? .week
     }
 
+    var isJourneyActive: Bool {
+        hasGoal && !isGoalReached && !isStreakLost
+    }
     
     var currentLogs: [DayLog] {
         guard let goal else { return [] }
@@ -78,11 +81,11 @@ class JourneyManager {
     }
     
     var canLog: Bool {
-        hasGoal && !isLoggedToday && !isGoalReached && !isStreakLost
+        isJourneyActive && todayState != .Learn
     }
 
     var canFreeze: Bool {
-        canLog && FreezesLeft > 0
+        isJourneyActive && todayState != .freeze && FreezesLeft > 0
     }
     
 
@@ -119,33 +122,27 @@ class JourneyManager {
 
     func Log(_ state: LearnState) {
 
-        guard canLog else {
-            print("Log blocked: no goal, already logged today, or goal reached")
-            return
-        }
-
         switch state {
         case .Learn:
-            break
+            guard canLog else { print("Learn blocked"); return }
         case .freeze:
-            guard canFreeze else {
-                print("Freeze blocked: no freezes left")
-                return
-            }
+            guard canFreeze else { print("Freeze blocked"); return }
         case .notLogged:
             return
         }
 
-        let newLog = DayLog(dayState: state)
-        
-        context.insert(newLog)
-        logs.append(newLog)
-        save()
-
-        print("Logged \(state) → streak: \(Streak), freezes used: \(FrezzesUsage), left: \(FreezesLeft)")
-        if isGoalReached {
-            print("Goal reached! \(Streak) learned + \(FrezzesUsage) frozen = \(Duration.days) days")
+        if isLoggedToday, let todayLog = logs.last {
+            todayLog.dayState = state
+            print("Changed today to \(state)")
+        } else {
+            let newLog = DayLog(dayState: state)
+            context.insert(newLog)
+            logs.append(newLog)
+            print("Logged \(state)")
         }
+
+        save()
+        print("→ streak: \(Streak), freezes used: \(FrezzesUsage), left: \(FreezesLeft)")
     }
 
 
