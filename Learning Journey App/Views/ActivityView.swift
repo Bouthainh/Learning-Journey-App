@@ -1,17 +1,19 @@
 import SwiftUI
 
 struct ActivityView: View {
+    
     @Environment(JourneyManager.self) private var journeyManager
 
     var body: some View {
+        
         VStack(alignment: .leading, spacing: 24) {
 
             header
-
-            WeekCalendar()                      // shared component
-
-            // stats
+            WeekCalendar()
+            
             HStack(spacing: 12) {
+                
+//MARK: State cards for freeze and learn counters
                 StateCard(icon: "flame.fill", color: .orange,
                          value: journeyManager.Streak, label: "Learned")
                 StateCard(icon: "snowflake", color: .cyan,
@@ -20,18 +22,20 @@ struct ActivityView: View {
 
             Spacer()
 
-            // the middle of the screen changes with the situation
+//MARK: Learning Situations(break 32 rule, win reaching goal)
             Group {
+                //Big Win
                 if journeyManager.isGoalReached {
                     goalEnded(icon: "hands.and.sparkles.fill",
                               title: "Well done!",
                               subtitle: "Ready for your next goal?")
+                //break the rule
                 } else if journeyManager.isStreakLost {
                     goalEnded(icon: "xmark.seal",
                               title: "You didn't reach your goal this time.",
                               subtitle: "Want to set another goal?")
                 } else {
-                    logSection
+                    logSection //still logging
                 }
             }
             .frame(maxWidth: .infinity)
@@ -39,11 +43,11 @@ struct ActivityView: View {
             Spacer()
         }
         .padding(.horizontal, 16)
-        .toolbar(.hidden, for: .navigationBar)   // our own header replaces the nav bar
+        
     }
 
-    // MARK: - Header
-
+    // MARK: view Header with date, two button actions (edit, calendar)
+    // header text view
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -66,6 +70,8 @@ struct ActivityView: View {
         }
     }
 
+    //header buttons view
+    //function that accepts the icon, and the navigation view to move to
     private func headerButton<Destination: View>(
         icon: String,
         @ViewBuilder destination: () -> Destination
@@ -84,7 +90,6 @@ struct ActivityView: View {
 
     //MARK: button style cases
     private var buttonLooks: (circle: ButtonLook, freeze: ButtonLook) {
-        // every possible look, named once
         let learnActive    = ButtonLook(title: "Log as Learned",    textColor: .white, glass: .regular.tint(.orange).interactive())
         let learnDone      = ButtonLook(title: "Logged as Learned", textColor: .gray,  glass: .regular)
         let freezeActive   = ButtonLook(title: "Freeze for a day",  textColor: .white, glass: .regular.tint(.cyan).interactive())
@@ -94,7 +99,7 @@ struct ActivityView: View {
         // the freeze button is blue only if there are freezes left
         let freezeAvailable = journeyManager.canFreeze ? freezeActive : freezeDisabled
 
-        // only the button that was pressed today is "done";
+        // only the button that was pressed today is "done"
         // the other one stays active so the user can change their mind
         switch journeyManager.todayState {
         case .notLogged: return (circle: learnActive, freeze: freezeAvailable)
@@ -103,6 +108,7 @@ struct ActivityView: View {
         }
     }
     
+    //buttons view
     private var logSection: some View {
         let looks = buttonLooks
 
@@ -139,7 +145,7 @@ struct ActivityView: View {
     }
 
     // MARK: Goal ended cases: well done / didn't reach
-
+    //Learning Situations text view
     private func goalEnded(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 8) {
             
@@ -171,7 +177,7 @@ struct ActivityView: View {
     }
 }
 
-// MARK: State card (only used on this screen, so it lives in this file)
+// MARK: State card
 
 private struct StateCard: View {
     let icon: String
@@ -195,7 +201,7 @@ private struct StateCard: View {
     }
 }
 
-//MARK: Primary and Freeze Buttons styles
+//MARK: Primary and Freeze Buttons style structure rules
 private struct ButtonLook {
     let title: String
     let textColor: Color

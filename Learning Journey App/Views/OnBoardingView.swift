@@ -3,6 +3,7 @@ import SwiftUI
 struct OnBoardingView : View {
     
     @Environment(JourneyManager.self) private var journeyManager
+    
     @State var goal = ""
     @State private var selectedDuration : LearningDuration = .week
     
@@ -41,6 +42,7 @@ struct OnBoardingView : View {
             
             VStack(spacing: 12){
                 
+//MARK: Set Goal Action
                 Button{
                     journeyManager.SetGoal(title: goal, duration: selectedDuration)
                 }
@@ -55,7 +57,8 @@ struct OnBoardingView : View {
                                 .interactive(),
                             in: .capsule
                         )
-                    
+//MARK: Goal Validaion Action
+
                 }.disabled(journeyManager.goalValiddation(for: goal) != nil)
                 
                 Text ("You can edit your desire later")

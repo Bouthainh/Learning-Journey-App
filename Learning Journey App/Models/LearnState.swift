@@ -1,6 +1,5 @@
 
-//case itratable to make dealing with enums as a collection
-// String to make the enum be stored
+//enum: a list of different states of user learning 
 enum LearnState: String, Codable, CaseIterable {
     
     case Learn

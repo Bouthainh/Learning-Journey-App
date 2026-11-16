@@ -1,5 +1,6 @@
 import SwiftUI
 
+//give a font extra functionality: setting font sizes, to reuse it across the app
 extension Font {
     
     static let AppTitle = Font.system(size: 34)

@@ -1,5 +1,5 @@
-
 import SwiftUI
+
 
 struct EditGoalView: View {
     @Environment(JourneyManager.self) private var journeyManager
@@ -9,12 +9,12 @@ struct EditGoalView: View {
     @State private var selectedDuration: LearningDuration = .week
     @State private var showUpdateAlert = false
 
-    // did the user change anything?
+    // did user change anything?
     private var hasChanges: Bool {
         goal != journeyManager.goal?.title || selectedDuration != journeyManager.Duration
     }
 
-    // the journey already ended → nothing to lose, so no warning needed
+    // the journey already ended, so no warning needed
     private var journeyEnded: Bool {
         journeyManager.isGoalReached || journeyManager.isStreakLost
     }
@@ -22,7 +22,7 @@ struct EditGoalView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 32) {
 
-            GoalSetter(goal: $goal)                     // shared component
+            GoalSetter(goal: $goal)
 
             VStack(alignment: .leading, spacing: 12) {
                 Text("I want to learn it in a")
@@ -55,7 +55,6 @@ struct EditGoalView: View {
             Text("If you update now, your streak will start over.")
         }
         .onAppear {
-            // start with the current goal filled in
             goal = journeyManager.goal?.title ?? ""
             selectedDuration = journeyManager.Duration
         }
@@ -63,11 +62,11 @@ struct EditGoalView: View {
 
     private func saveTapped() {
         if journeyEnded {
-            update()                 // "Set a goal" after the end: no warning
+            update()
         } else if hasChanges {
-            showUpdateAlert = true   // journey running: warn first
+            showUpdateAlert = true
         } else {
-            dismiss()                // nothing changed: just go back
+            dismiss()                
         }
     }
 

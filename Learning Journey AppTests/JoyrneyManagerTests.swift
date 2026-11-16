@@ -200,7 +200,7 @@ struct JourneyManagerTests {
     // MARK: - Goal reached
 
     @Test func goalReachedAfterAllDays() {
-        context.insert(LearningGoal(title: "Swift", duration: .week, startDate: daysAgo(8)))
+        context.insert(LearningGoal(title: "APIs", duration: .week, startDate: daysAgo(8)))
         for day in 1...7 {
             context.insert(DayLog(date: daysAgo(day), dayState: .Learn))
         }
@@ -213,7 +213,7 @@ struct JourneyManagerTests {
 
     @Test func freezesCountTowardGoal() {
         // 5 learned + 2 frozen = 7 days = week done
-        context.insert(LearningGoal(title: "Swift", duration: .week, startDate: daysAgo(8)))
+        context.insert(LearningGoal(title: "dotnet", duration: .week, startDate: daysAgo(8)))
         for day in 1...5 { context.insert(DayLog(date: daysAgo(day), dayState: .Learn)) }
         context.insert(DayLog(date: daysAgo(6), dayState: .freeze))
         context.insert(DayLog(date: daysAgo(7), dayState: .freeze))
@@ -225,7 +225,7 @@ struct JourneyManagerTests {
     // MARK: - 32-hour rule
 
     @Test func streakAliveBefore32Hours() {
-        context.insert(LearningGoal(title: "Swift", duration: .week, startDate: daysAgo(3)))
+        context.insert(LearningGoal(title: "c++", duration: .week, startDate: daysAgo(3)))
         context.insert(DayLog(date: hoursAgo(31), dayState: .Learn))
         let manager = makeManager()
 
@@ -270,7 +270,7 @@ struct JourneyManagerTests {
     // MARK: - Calendar
 
     @Test func stateForEachDay() {
-        context.insert(LearningGoal(title: "Swift", duration: .week, startDate: daysAgo(3)))
+        context.insert(LearningGoal(title: "java", duration: .week, startDate: daysAgo(3)))
         context.insert(DayLog(date: daysAgo(2), dayState: .Learn))
         context.insert(DayLog(date: daysAgo(1), dayState: .freeze))
         let manager = makeManager()
