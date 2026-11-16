@@ -1,129 +1,232 @@
-//follows the observation framework
 import Observation
 import Foundation
+import SwiftData
 
 @Observable
-class JourneyManager{
-    
-    //MARK: properties with storing logic
-    var Duration : LearningDuration = .week {
-        didSet{
-            UserDefaults.standard.set(Duration.rawValue, forKey: "Duration")
-        }}
-    
-    var Streak : Int = 0 {
-        didSet{
-            UserDefaults.standard.set(Streak, forKey: "Streak")
-        }}
-    
-    var FrezzesUsage : Int = 0 {
-        didSet{
-            UserDefaults.standard.set(FrezzesUsage, forKey: "FrezzesUsage")
-        }}
-    
-    var LastLoggedDate : Date? {
-        didSet {
-            UserDefaults.standard.set(LastLoggedDate, forKey: "LastLoggedDate")
-        }}
-    
-    var lastLoggedState: LearnState = .notLogged {
-          didSet { UserDefaults.standard.set(lastLoggedState.rawValue, forKey: Keys.lastLoggedState) }
-      }
-    
-    var didLoseStreak :Bool = false
-    
-    //MARK: init()
-    init(){
-        
-        let defaults = UserDefaults.standard
-        
-        let savedDuration = defaults.string(forKey: "Duration") ?? ""
-        Duration = LearningDuration(rawValue: savedDuration) ?? .week
-        
-        Streak = defaults.integer(forKey: "Streak")
-        
-        FrezzesUsage = defaults.integer(forKey: "FrezzesUsage")
-        
-        LastLoggedDate = defaults.object(forKey: "LastLoggedDate") as? Date
-        
-        let savedState = defaults.string(forKey: "lastLoggedState") ?? ""
-        lastLoggedState = LearnState(rawValue: savedState) ?? .notLogged
+class JourneyManager {
+
+    // MARK: Stored (loaded from SwiftData)
+
+    private let context: ModelContext
+
+    var goal: LearningGoal?
+    var logs: [DayLog] = []
+
+
+    // MARK: init()
+
+    init(context: ModelContext) {
+        self.context = context
+        loadData()
     }
+
+    private func loadData() {
+        goal = try? context.fetch(FetchDescriptor<LearningGoal>()).first
+
+        let byDate = FetchDescriptor<DayLog>(sortBy: [SortDescriptor(\.date)])
+        logs = (try? context.fetch(byDate)) ?? []
+
+        print("Loaded data>> goal: \(goal?.title ?? "none"), duration: \(Duration), logs: \(logs.count), streak: \(Streak), freezes used: \(FrezzesUsage)")
+    }
+
+    // MARK: Computed properties
+
+    var hasGoal: Bool {
+        goal != nil
+    }
+
+    var Duration: LearningDuration {
+        goal?.duration ?? .week
+    }
+
     
-    //Computed properties
-    
-    var FreezesLeft: Int { Duration.maxFreezes - FrezzesUsage}
-    
+    var currentLogs: [DayLog] {
+        guard let goal else { return [] }
+        return logs.filter { $0.date >= goal.startDate }
+    }
+
+    var Streak: Int {
+        currentLogs.filter { $0.dayState == .Learn }.count
+    }
+
+    var FrezzesUsage: Int {
+        currentLogs.filter { $0.dayState == .freeze }.count
+    }
+
+    var FreezesLeft: Int {
+        Duration.maxFreezes - FrezzesUsage
+    }
+
     var isLoggedToday: Bool {
-        
-        guard let LastLoggedDate else {return false}
-        
-        return Calendar.current.isDateInToday(LastLoggedDate)
+        guard let lastLog = logs.last else { return false }
+        return Calendar.current.isDateInToday(lastLog.date)
+    }
+
+    var todayState: LearnState {
+        guard isLoggedToday, let lastLog = logs.last else { return .notLogged }
+        return lastLog.dayState
+    }
+
+    var isGoalReached: Bool {
+        hasGoal && Streak + FrezzesUsage >= Duration.days
+    }
+
+    var isStreakLost: Bool {
+        guard let goal, !isGoalReached else { return false }
+        let lastActivity = currentLogs.last?.date ?? goal.startDate
+        return Date().timeIntervalSince(lastActivity) > 32 * 60 * 60
     }
     
     var canLog: Bool {
-        !isLoggedToday && !isGoalReached
+        hasGoal && !isLoggedToday && !isGoalReached && !isStreakLost
     }
-    
-    var canFreeze : Bool{
+
+    var canFreeze: Bool {
         canLog && FreezesLeft > 0
-        
     }
     
-    var isGoalReached: Bool {
-        Streak + FrezzesUsage >= Duration.days
+
+    // MARK: calendar logic
+
+ 
+    func state(for date: Date) -> LearnState {
+        let log = logs.last { Calendar.current.isDate($0.date, inSameDayAs: date) }
+        return log?.dayState ?? .notLogged
     }
-    
-    //MARK: functions
-    
-    //action > when user Log it checks which state, and do calcultion
-    func Log( state: LearnState ){
+
+    // MARK: Actions
+
+    // Onboarding "Start Learning" and the edit goal screen call this
+    func SetGoal(title: String, duration: LearningDuration) {
         
-        guard canLog else {return}
-        
+        guard goalValiddation(for: title) == nil else {
+            print("Goal rejected: \(goalValiddation(for: title) ?? "")")
+            return
+        }
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let goal {
+            goal.title = title
+            goal.duration = duration
+            goal.startDate = .now
+        } else {
+            let newGoal = LearningGoal(title: title, duration: duration)
+            context.insert(newGoal)
+            goal = newGoal
+        }
+        save()
+        print("Goal set: \(title) for a \(duration), journey starts now")
+    }
+
+    func Log(_ state: LearnState) {
+
+        guard canLog else {
+            print("Log blocked: no goal, already logged today, or goal reached")
+            return
+        }
+
         switch state {
-            
         case .Learn:
-            Streak+=1
-        
+            break
         case .freeze:
-            guard canFreeze else {return}
-            FrezzesUsage+=1
-            
+            guard canFreeze else {
+                print("Freeze blocked: no freezes left")
+                return
+            }
         case .notLogged:
             return
-            
         }
-        
-        LastLoggedDate = Date()
-        lastLoggedState = state
-        didLoseStreak = false
 
+        let newLog = DayLog(dayState: state)
+        
+        context.insert(newLog)
+        logs.append(newLog)
+        save()
+
+        print("Logged \(state) → streak: \(Streak), freezes used: \(FrezzesUsage), left: \(FreezesLeft)")
+        if isGoalReached {
+            print("Goal reached! \(Streak) learned + \(FrezzesUsage) frozen = \(Duration.days) days")
+        }
     }
 
-    //action > checks streak is alive? "32h rule"
-    func CheckStreak(){
-        
-        guard let LastLoggedDate else {return}
-        
-        let timePassed = Date().timeIntervalSince(LastLoggedDate)
-        let limit : TimeInterval = 32 * 60 * 60
-        
-        if timePassed > limit {
-            
-            Streak = 0
-            didLoseStreak = true
+
+    // MARK: - Saving
+
+    private func save() {
+        do {
+            try context.save()
+        } catch {
+            print("Save failed: \(error)")
         }
     }
     
-    //action > if update new goal, it reintialized all properties
-    func ChangeDuration ( to newDuration : LearningDuration ){
-        
-        Duration = newDuration
-        Streak = 0
-        FrezzesUsage = 0
-        LastLoggedDate = nil
-        lastLoggedState = .notLogged
-        didLoseStreak = false
+    // MARK: Goal Validation
+
+    func goalValiddation(for title: String) -> String? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmed.isEmpty {
+            return "Please write your learning goal"
+        }
+        if let firstLetter = trimmed.first, firstLetter.isNumber {
+            return "Your goal can't start with a number"
+        }
+        return nil
     }
+}
+
+// MARK:  Preview helper
+extension JourneyManager {
+
+    enum PreviewScenario {
+        case noGoal        // onboarding
+        case active        // goal running, today not logged yet
+        case goalReached   // "Well done!"
+        case streakLost    // "You didn't reach your goal"
+    }
+
+    // keeps each preview database alive (same problem we fixed before)
+    @MainActor private static var previewContainers: [ModelContainer] = []
+
+    @MainActor
+    static func preview(_ scenario: PreviewScenario) -> JourneyManager {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: LearningGoal.self, DayLog.self, configurations: config)
+        previewContainers.append(container)
+        let context = container.mainContext
+
+        // helper: a date X days before today
+        func daysAgo(_ days: Int) -> Date {
+            Calendar.current.date(byAdding: .day, value: -days, to: .now)!
+        }
+
+        switch scenario {
+        case .noGoal:
+            break
+
+        case .active:
+            context.insert(LearningGoal(title: "Swift", duration: .week, startDate: daysAgo(3)))
+            context.insert(DayLog(date: daysAgo(2), dayState: .Learn))
+            context.insert(DayLog(date: daysAgo(1), dayState: .freeze))
+
+        case .goalReached:
+            // a week goal with 7 learned days → 7 >= 7
+            context.insert(LearningGoal(title: "Swift", duration: .week, startDate: daysAgo(8)))
+            for day in 1...7 {
+                context.insert(DayLog(date: daysAgo(day), dayState: .Learn))
+            }
+
+        case .streakLost:
+            // last log was 3 days ago → more than 32 hours
+            context.insert(LearningGoal(title: "test meee", duration: .week, startDate: daysAgo(6)))
+            context.insert(DayLog(date: daysAgo(5), dayState: .Learn))
+            context.insert(DayLog(date: daysAgo(4), dayState: .Learn))
+            context.insert(DayLog(date: daysAgo(3), dayState: .freeze))
+        }
+
+        // created AFTER inserting, so init() loads the fake data
+        return JourneyManager(context: context)
+    }
+
+    // old name still works for the other previews
+    @MainActor static var preview: JourneyManager { preview(.noGoal) }
 }

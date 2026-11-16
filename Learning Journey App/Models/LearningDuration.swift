@@ -1,4 +1,4 @@
-enum LearningDuration: String, CaseIterable{
+enum LearningDuration: String,Codable, CaseIterable{
     
     case week
     case month
