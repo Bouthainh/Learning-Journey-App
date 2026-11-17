@@ -1,5 +1,6 @@
 import SwiftUI
 
+//Root: Decide the first screen, and Set up navigation for the app
 struct RootView : View {
     
     @Environment(JourneyManager.self) private var journeyManager

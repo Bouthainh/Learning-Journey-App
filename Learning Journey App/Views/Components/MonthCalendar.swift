@@ -1,21 +1,25 @@
-
 import SwiftUI
 
+//shared component for full year month-calander, reused in calendar views
+
 struct MonthCalendar: View {
+    
     @Environment(JourneyManager.self) private var journeyManager
-    let month: Date   // any date inside the month to show
+    
+    let month: Date
 
     private let calendar = Calendar.current
+    
     private let columns = Array(repeating: GridItem(.flexible()), count: 7)
 
-    // "SUN", "MON", ... starting from the user's first weekday
+  
     private var weekdaySymbols: [String] {
         let symbols = calendar.shortWeekdaySymbols.map { $0.uppercased() }
         let first = calendar.firstWeekday - 1
         return Array(symbols[first...] + symbols[..<first])
     }
 
-    // the grid cells: empty spaces (nil) before day 1, then every day of the month
+
     private var cells: [Date?] {
         guard let interval = calendar.dateInterval(of: .month, for: month),
               let dayCount = calendar.range(of: .day, in: .month, for: month)?.count
@@ -34,7 +38,7 @@ struct MonthCalendar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
 
-            Text(month, format: .dateTime.month(.wide).year())   // "January 2026"
+            Text(month, format: .dateTime.month(.wide).year())
                 .font(.headline)
 
             LazyVGrid(columns: columns, spacing: 12) {
@@ -44,8 +48,7 @@ struct MonthCalendar: View {
                         .foregroundStyle(.gray)
                 }
 
-                // enumerated() gives each cell a position number to use as its id,
-                // because the empty cells (nil) have no date to identify them
+                // enumerated() gives each cell a position number to use as its id
                 ForEach(Array(cells.enumerated()), id: \.offset) { _, day in
                     if let day {
                         DayCircler(date: day, state: journeyManager.state(for: day))
@@ -56,10 +59,4 @@ struct MonthCalendar: View {
             }
         }
     }
-}
-
-#Preview {
-    MonthCalendar(month: .now)
-        .environment(JourneyManager.preview(.active))
-        .padding()
 }

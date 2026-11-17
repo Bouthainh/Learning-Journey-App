@@ -2,11 +2,16 @@ import Observation
 import Foundation
 import SwiftData
 
+/*centerd manager: handel app logic and learing cases
+ under observation framework, making the manager ready to observe all changes
+ coming from UI, and apply needed commands to reflect that change */
+
 @Observable
 class JourneyManager {
 
-    // MARK: Stored (loaded from SwiftData)
+    // MARK: Stored variables (loaded from sw data)
 
+    //a context from sw data, making data operation available
     private let context: ModelContext
 
     var goal: LearningGoal?
@@ -14,21 +19,25 @@ class JourneyManager {
 
 
     // MARK: init()
-
+    // apply Dependecy injection to create the sw db
     init(context: ModelContext) {
         self.context = context
         loadData()
     }
 
+    //MARK: Load function
+    //fetch data from db, bring only last goal,and all days states.. if null, then new user
     private func loadData() {
         goal = try? context.fetch(FetchDescriptor<LearningGoal>()).first
 
         let byDate = FetchDescriptor<DayLog>(sortBy: [SortDescriptor(\.date)])
         logs = (try? context.fetch(byDate)) ?? []
 
+        //terminal msg .. dev check purpose
         print("Loaded data>> goal: \(goal?.title ?? "none"), duration: \(Duration), logs: \(logs.count), streak: \(Streak), freezes used: \(FrezzesUsage)")
     }
 
+    
     // MARK: Computed properties
 
     var hasGoal: Bool {
@@ -39,6 +48,9 @@ class JourneyManager {
         goal?.duration ?? .week
     }
 
+    var isJourneyActive: Bool {
+        hasGoal && !isGoalReached && !isStreakLost
+    }
     
     var currentLogs: [DayLog] {
         guard let goal else { return [] }
@@ -71,6 +83,7 @@ class JourneyManager {
         hasGoal && Streak + FrezzesUsage >= Duration.days
     }
 
+    //32 rule
     var isStreakLost: Bool {
         guard let goal, !isGoalReached else { return false }
         let lastActivity = currentLogs.last?.date ?? goal.startDate
@@ -78,88 +91,102 @@ class JourneyManager {
     }
     
     var canLog: Bool {
-        hasGoal && !isLoggedToday && !isGoalReached && !isStreakLost
+        isJourneyActive && todayState != .Learn
     }
 
     var canFreeze: Bool {
-        canLog && FreezesLeft > 0
+        isJourneyActive && todayState != .freeze && FreezesLeft > 0
     }
     
-
-    // MARK: calendar logic
-
- 
+    
+    // MARK: Manager Actions
+    
+    // MARK: action.1 look for learning state in stored logs
     func state(for date: Date) -> LearnState {
         let log = logs.last { Calendar.current.isDate($0.date, inSameDayAs: date) }
         return log?.dayState ?? .notLogged
     }
 
-    // MARK: Actions
 
-    // Onboarding "Start Learning" and the edit goal screen call this
+    //MARK: action.2 Setting the goal (from user input: title, duration)
+    // rused twice: Onboarding "Start Learning" and the edit goal
     func SetGoal(title: String, duration: LearningDuration) {
         
+        //first validate the input
         guard goalValiddation(for: title) == nil else {
+            
+            //terminal msg .. dev check purpose
             print("Goal rejected: \(goalValiddation(for: title) ?? "")")
             return
         }
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let goal {
+        
+        if let goal { //for update action, already have a gaol
             goal.title = title
             goal.duration = duration
             goal.startDate = .now
-        } else {
+            
+        } else { // creating new goal
             let newGoal = LearningGoal(title: title, duration: duration)
             context.insert(newGoal)
             goal = newGoal
         }
+        
         save()
+        
+        //terminal msg .. dev check purpose
         print("Goal set: \(title) for a \(duration), journey starts now")
     }
 
+    
+    //MARK: action.3 learning logging with state options
     func Log(_ state: LearnState) {
-
-        guard canLog else {
-            print("Log blocked: no goal, already logged today, or goal reached")
-            return
-        }
 
         switch state {
         case .Learn:
-            break
+            guard canLog else { print("Learn blocked"); return }
         case .freeze:
-            guard canFreeze else {
-                print("Freeze blocked: no freezes left")
-                return
-            }
+            guard canFreeze else { print("Freeze blocked"); return }
         case .notLogged:
             return
         }
 
-        let newLog = DayLog(dayState: state)
-        
-        context.insert(newLog)
-        logs.append(newLog)
-        save()
-
-        print("Logged \(state) → streak: \(Streak), freezes used: \(FrezzesUsage), left: \(FreezesLeft)")
-        if isGoalReached {
-            print("Goal reached! \(Streak) learned + \(FrezzesUsage) frozen = \(Duration.days) days")
+        //already have state and its updated
+        if isLoggedToday, let todayLog = logs.last {
+            todayLog.dayState = state
+            
+            //dev msg
+            print("Changed today to \(state)")
         }
+        //new state, create log and add to the array in db
+        else {
+            let newLog = DayLog(dayState: state)
+            context.insert(newLog)
+            logs.append(newLog)
+            
+            //dev msg
+            print("Logged \(state)")
+        }
+
+        save()
+        
+        //dev msg
+        print("→ streak: \(Streak), freezes used: \(FrezzesUsage), left: \(FreezesLeft)")
     }
 
 
-    // MARK: - Saving
+    // MARK: action.4 Saving changes and new creations in db
 
     private func save() {
         do {
             try context.save()
         } catch {
+            //dev msg
             print("Save failed: \(error)")
         }
     }
     
-    // MARK: Goal Validation
+    // MARK: action.5 Goal Validation >> string validation
 
     func goalValiddation(for title: String) -> String? {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -172,61 +199,4 @@ class JourneyManager {
         }
         return nil
     }
-}
-
-// MARK:  Preview helper
-extension JourneyManager {
-
-    enum PreviewScenario {
-        case noGoal        // onboarding
-        case active        // goal running, today not logged yet
-        case goalReached   // "Well done!"
-        case streakLost    // "You didn't reach your goal"
-    }
-
-    // keeps each preview database alive (same problem we fixed before)
-    @MainActor private static var previewContainers: [ModelContainer] = []
-
-    @MainActor
-    static func preview(_ scenario: PreviewScenario) -> JourneyManager {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try! ModelContainer(for: LearningGoal.self, DayLog.self, configurations: config)
-        previewContainers.append(container)
-        let context = container.mainContext
-
-        // helper: a date X days before today
-        func daysAgo(_ days: Int) -> Date {
-            Calendar.current.date(byAdding: .day, value: -days, to: .now)!
-        }
-
-        switch scenario {
-        case .noGoal:
-            break
-
-        case .active:
-            context.insert(LearningGoal(title: "Swift", duration: .week, startDate: daysAgo(3)))
-            context.insert(DayLog(date: daysAgo(2), dayState: .Learn))
-            context.insert(DayLog(date: daysAgo(1), dayState: .freeze))
-
-        case .goalReached:
-            // a week goal with 7 learned days → 7 >= 7
-            context.insert(LearningGoal(title: "Swift", duration: .week, startDate: daysAgo(8)))
-            for day in 1...7 {
-                context.insert(DayLog(date: daysAgo(day), dayState: .Learn))
-            }
-
-        case .streakLost:
-            // last log was 3 days ago → more than 32 hours
-            context.insert(LearningGoal(title: "test meee", duration: .week, startDate: daysAgo(6)))
-            context.insert(DayLog(date: daysAgo(5), dayState: .Learn))
-            context.insert(DayLog(date: daysAgo(4), dayState: .Learn))
-            context.insert(DayLog(date: daysAgo(3), dayState: .freeze))
-        }
-
-        // created AFTER inserting, so init() loads the fake data
-        return JourneyManager(context: context)
-    }
-
-    // old name still works for the other previews
-    @MainActor static var preview: JourneyManager { preview(.noGoal) }
 }

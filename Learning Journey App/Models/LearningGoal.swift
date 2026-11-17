@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 
+//A model of Learing Goal when setting, with characters: (title,duration to achive this goal, when to start?)
+
 @Model
 final class LearningGoal {
     
