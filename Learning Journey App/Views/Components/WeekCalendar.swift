@@ -1,5 +1,7 @@
 import SwiftUI
 
+//shared component for full year month-calander, reused in activity view
+
 struct WeekCalendar: View {
     @Environment(JourneyManager.self) private var journeyManager
 
@@ -13,13 +15,13 @@ struct WeekCalendar: View {
         HStack {
             ForEach(weekDays, id: \.self) { day in
                 VStack(spacing: 8) {
-                    Text(day, format: .dateTime.weekday(.narrow))   // "S", "M", ...
+                    Text(day, format: .dateTime.weekday(.narrow))   
                         .font(.caption)
                         .foregroundStyle(.gray)
 
                     DayCircler(date: day, state: journeyManager.state(for: day))
                 }
-                .frame(maxWidth: .infinity)   // 7 equal columns
+                .frame(maxWidth: .infinity)
             }
         }
     }

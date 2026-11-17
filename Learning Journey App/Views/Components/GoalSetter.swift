@@ -1,9 +1,11 @@
 import SwiftUI
 
+//shared component to set goal : system msg, field for user input. rused in onBoard, Edit views
 struct GoalSetter : View {
     
-    @Environment(JourneyManager.self) private var journeyManager
-       @Binding var goal: String   // owned by the parent screen
+    @Environment(JourneyManager.self) private var journeyManager //connect to the shared JM
+    
+    @Binding var goal: String //follows the value state of Onboard, Edit views
 
        var body: some View {
            VStack(alignment: .leading, spacing: 12) {
@@ -14,7 +16,7 @@ struct GoalSetter : View {
 
                Divider()
 
-               // show the error only after the user starts typing
+               // show the error after the user starts typing
                if let error = journeyManager.goalValiddation(for: goal), !goal.isEmpty {
                    Text(error)
                        .font(.footnote)
@@ -22,10 +24,4 @@ struct GoalSetter : View {
                }
            }
        }
-   }
-
-   #Preview {
-       GoalSetter(goal: .constant("5 apps"))
-           .environment(JourneyManager.preview)
-           .padding()
    }

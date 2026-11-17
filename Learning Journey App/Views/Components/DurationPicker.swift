@@ -1,15 +1,10 @@
-//
-//  DurationPicker.swift
-//  Learning Journey App
-//
-//  Week / Month / Year glass buttons. Shared by OnBoarding and EditGoalView.
-//
-
 import SwiftUI
 
+//shared component of duration picker (week, month, year)
 struct DurationPicker: View {
-    @Binding var selected: LearningDuration   // owned by the parent screen
-
+    
+    @Binding var selected: LearningDuration   //follows the value state of Onboard, Edit views
+    
     var body: some View {
         HStack(spacing: 12) {
             ForEach(LearningDuration.allCases, id: \.self) { duration in
@@ -34,9 +29,4 @@ struct DurationPicker: View {
             }
         }
     }
-}
-
-#Preview {
-    DurationPicker(selected: .constant(.month))
-        .padding()
 }
